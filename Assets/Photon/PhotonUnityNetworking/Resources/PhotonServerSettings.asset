@@ -76,6 +76,16 @@ MonoBehaviour:
   - ReceiveVoteResult
   - TriggerVotingPhase
   - AnnounceRoundWinner
+  - RPC_EndTurn
+  - NotifyNoVoters
+  - RPC_AnnounceRoundWinner
+  - RPC_BeginDebatePhase
+  - RPC_EndDebate
+  - RPC_NotifyNoVoters
+  - RPC_ReceiveVoteResult
+  - RPC_StartTurn
+  - RPC_SyncArgumentDisplay
+  - RPC_TriggerVotingPhase
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

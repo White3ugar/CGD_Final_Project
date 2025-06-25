@@ -5239,32 +5239,6 @@ MonoBehaviour:
   nameTextPrefab: {fileID: 2746124779290991097, guid: a5d616460881be9419506e2e089c52ff, type: 3}
   contentPanel: {fileID: 1874048818}
   countdownText: {fileID: 1897129189}
-  argumentSets:
-  - supportingArguments:
-    - Traditional crafts and practices are being replaced by mass production and
-      automation
-    - Encourages students to learn and appreciate cultural diversity
-    - Dialects are part of cultural identity and heritage
-    - Wearing traditional attire keeps cultural identity alive
-    - Traditional games promote physical activity and outdoor play
-    refutingArguments:
-    - Technology helps preserve culture through digital archiving and documentation
-    - Not all students may relate to the same festivals, leading to exclusion
-    - Standard Malay and English are more practical for communication and employment
-    - Traditional attire may not be practical for modern work or weather
-    - Modern games offer immersive learning and problem-solving skills
-  - supportingArguments:
-    - Younger generations are more engaged with digital trends than cultural activities
-    - Preserves national identity among younger generations
-    - Preserves generational bonds and respect for elders
-    - Reflects pride in one's heritage and roots
-    - Traditional games encourage social interaction and teamwork
-    refutingArguments:
-    - Social media can promote traditional festivals to a wider audience
-    - Adds pressure to an already packed school curriculum
-    - Limited usage in official or academic contexts
-    - Freedom of dress is a personal right and shouldn't be restricted
-    - Online games connect players globally, building social networks
 --- !u!4 &349238313
 Transform:
   m_ObjectHideFlags: 0
@@ -26259,6 +26233,33 @@ MonoBehaviour:
   - Is learning local dialects still important in modern Malaysia?
   - Should we preserve traditional attire in daily life?
   - Is traditional game better than modern games?
+  argumentSets:
+  - supportingArguments:
+    - Traditional crafts and practices are being replaced by mass production and
+      automation
+    - Traditional festivals encourages students to learn and appreciate cultural
+      diversity
+    - Dialects are part of cultural identity and heritage
+    - Wearing traditional attire keeps cultural identity alive
+    - Traditional games promote physical activity and outdoor play
+    refutingArguments:
+    - Technology helps preserve culture through digital archiving and documentation
+    - Not all students may relate to the same festivals, leading to exclusion
+    - Standard Malay and English are more practical for communication and employment
+    - Traditional attire may not be practical for modern work or weather
+    - Modern games offer immersive learning and problem-solving skills
+  - supportingArguments:
+    - Younger generations are more engaged with digital trends than cultural activities
+    - Traditional festivals preserve national identity among younger generations
+    - Local dialects preserves generational bonds and respect for elders
+    - Traditional attires reflect pride in one's heritage and roots
+    - Traditional games encourage social interaction and teamwork
+    refutingArguments:
+    - Social media can promote traditional festivals to a wider audience
+    - Adds pressure to an already packed school curriculum
+    - Limited usage in official or academic contexts
+    - Freedom of dress is a personal right and shouldn't be restricted
+    - Online games connect players globally, building social networks
 --- !u!4 &1838902203
 Transform:
   m_ObjectHideFlags: 0

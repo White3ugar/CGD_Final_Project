@@ -6,13 +6,6 @@ using System.Collections;
 using System.Collections.Generic;
 using ExitGames.Client.Photon; // For Photon.Hashtable
 
-// [System.Serializable]
-// public class ArgumentSet
-// {
-//     public string[] supportingArguments = new string[5];
-//     public string[] refutingArguments = new string[5];
-// }
-
 public class LobbyManager : MonoBehaviourPunCallbacks
 {
     [Header("UI References")]
@@ -20,9 +13,6 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     public GameObject nameTextPrefab;
     public Transform contentPanel;
     public TMP_Text countdownText;
-
-    // [SerializeField] private List<ArgumentSet> argumentSets = new List<ArgumentSet>();
-
 
     private Dictionary<string, GameObject> playerTexts = new Dictionary<string, GameObject>();
     private bool countdownStarted = false;
@@ -111,79 +101,42 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
         if (PhotonNetwork.IsMasterClient && !countdownStarted)
         {
-            // Testing mode for 1 or 2 players, for testing123
-            if (playerCount == 1) // start countdown with 2 players for built version, change to 1 for testing in editor
+            if (playerCount == 3) // For testing
             {
                 countdownStarted = true;
-                Debug.LogWarning("Only 1/2 player in room. Starting countdown for testing purposes...");
-                photonView.RPC(nameof(StartCountdown), RpcTarget.All);
+                Debug.LogWarning("Testing mode (2 players). Starting synced countdown...");
+                double startTime = PhotonNetwork.Time + 5; // 5s buffer
+                photonView.RPC(nameof(StartCountdown), RpcTarget.All, startTime);
             }
-            // Real mode: only trigger when 5 players
-            else if (playerCount == 5)
+            else if (playerCount == 5) // Real game condition
             {
                 countdownStarted = true;
-                Debug.Log("5 players ready. Starting game...");
-                photonView.RPC(nameof(StartCountdown), RpcTarget.All);
-            }
-            // All other cases
-            else
-            {
-                // Do not start countdown
-                return;
+                Debug.Log("5 players ready. Starting synced countdown...");
+                double startTime = PhotonNetwork.Time + 5;
+                photonView.RPC(nameof(StartCountdown), RpcTarget.All, startTime);
             }
         }
     }
 
     [PunRPC]
-    private void StartCountdown()
+    private void StartCountdown(double networkStartTime)
     {
-        StartCoroutine(CountdownToGame());
+        StartCoroutine(CountdownToGame(networkStartTime));
     }
 
-    private IEnumerator CountdownToGame()
+    private IEnumerator CountdownToGame(double startTime)
     {
         countdownText.gameObject.SetActive(true);
 
-        int seconds = 5;
-        while (seconds > 0)
+        while (PhotonNetwork.Time < startTime)
         {
-            countdownText.text = $"Go to library in {seconds} seconds...";
-            yield return new WaitForSeconds(1f);
-            seconds--;
+            int secondsLeft = Mathf.CeilToInt((float)(startTime - PhotonNetwork.Time));
+            countdownText.text = $"Go to library in {secondsLeft} seconds...";
+            yield return null;
         }
 
         countdownText.text = "Teleporting...";
         yield return new WaitForSeconds(1f);
-
-        // Check role before spawning
-        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Role", out object roleObj))
-        {
-            string role = roleObj as string;
-
-            /*
-            if (role == "Debater 1" || role == "Debater 2")
-            {
-                ArgumentSpawner spawner = FindObjectOfType<ArgumentSpawner>();
-                if (spawner != null)
-                {
-                    Debug.Log($"🔁 {PhotonNetwork.LocalPlayer.NickName} ({role}) is spawning their own collectables...");
-                    spawner.SpawnPlayerCollectables(argumentSets);
-                }
-                else
-                {
-                    Debug.LogWarning("❌ ArgumentSpawner not found in scene!");
-                }
-            }
-            else
-            {
-                Debug.Log($"{PhotonNetwork.LocalPlayer.NickName} is a {role}, no collectables will be spawned.");
-            }
-            */
-        }
-        else
-        {
-            Debug.LogWarning("Player role not found in custom properties.");
-        }
 
         FindObjectOfType<SpawnManager>()?.TeleportToGameRoom();
     }

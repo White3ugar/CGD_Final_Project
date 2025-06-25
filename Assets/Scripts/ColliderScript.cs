@@ -34,6 +34,7 @@ public class ColliderScript : MonoBehaviour
                 {
                     MeshCollider meshCollider = child.gameObject.AddComponent<MeshCollider>();
                     meshCollider.convex = false;
+                    
                 }
             }
         }

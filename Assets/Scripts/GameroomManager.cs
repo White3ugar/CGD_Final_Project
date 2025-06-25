@@ -143,8 +143,9 @@ public class GameroomManager : MonoBehaviourPunCallbacks
             }
         }
 
-        // 🔁 Call courtroom countdown for all clients
-        photonView.RPC(nameof(StartCourtroomCountdown), RpcTarget.All);
+        // Call courtroom countdown for all clients
+        double startTime = PhotonNetwork.Time + 60; // 60 seconds countdown
+        photonView.RPC(nameof(StartCourtroomCountdown), RpcTarget.All, startTime);
     }
 
     [PunRPC]
@@ -166,12 +167,6 @@ public class GameroomManager : MonoBehaviourPunCallbacks
         string confirmedRole = PhotonNetwork.LocalPlayer.CustomProperties["Role"] as string;
         Debug.Log($"Eventually confirmed role: {confirmedRole}");
 
-        if (roleText != null)
-        {
-            roleText.text = $"Your role: {confirmedRole}";
-            roleText.gameObject.SetActive(true);
-        }
-
         // Spawn collectables only for debaters
         if (confirmedRole == "Debater 1" || confirmedRole == "Debater 2")
         {
@@ -186,31 +181,33 @@ public class GameroomManager : MonoBehaviourPunCallbacks
                 Debug.LogWarning("❌ ArgumentSpawner not found in scene!");
             }
         }
+
+        if (roleText != null)
+        {
+            roleText.text = $"Your role: {confirmedRole}";
+            roleText.gameObject.SetActive(true);
+        }
     }
 
     [PunRPC]
-    private void StartCourtroomCountdown()
+    private void StartCourtroomCountdown(double startTime)
     {
-        StartCoroutine(CountdownToCourtRoom());
+        StartCoroutine(CountdownToCourtRoom(startTime));
     }
 
-    private IEnumerator CountdownToCourtRoom()
+    private IEnumerator CountdownToCourtRoom(double startTime)
     {
         if (gameroomcountdownText != null)
             gameroomcountdownText.gameObject.SetActive(true);
 
-        int seconds = 180;
-        //for testing123 purposes, set to 15 seconds
-        seconds = 60;
-
-        while (seconds > 0)
+        while (PhotonNetwork.Time < startTime)
         {
-            int minutes = seconds / 60;
-            int secs = seconds % 60;
+            float remaining = (float)(startTime - PhotonNetwork.Time);
+            int minutes = Mathf.FloorToInt(remaining / 60f);
+            int seconds = Mathf.CeilToInt(remaining % 60f);
 
-            gameroomcountdownText.text = $"Go to court in {minutes:D2}:{secs:D2}";
-            yield return new WaitForSeconds(1f);
-            seconds--;
+            gameroomcountdownText.text = $"Go to court in {minutes:D2}:{seconds:D2}";
+            yield return null;
         }
 
         gameroomcountdownText.text = "Teleporting...";

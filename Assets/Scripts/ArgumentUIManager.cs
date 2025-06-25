@@ -28,17 +28,12 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
     public GameObject votingPanel;
     public Button voteDebater1Button;
     public Button voteDebater2Button;
+    private Coroutine votingCountdownCoroutine;
+    private float votingCountdownTime = 10f;
+
     private Dictionary<int, string> currentVotes = new Dictionary<int, string>();
     private List<string> roundWinners = new List<string>();
-
     private int totalVoters = 0;
-
-    [PunRPC]
-    void AnnounceRoundWinner(string winner)
-    {
-        Debug.Log($"Round winner: {winner}");
-        roundWinners.Add(winner);
-    }
 
     void Start()
     {
@@ -54,6 +49,7 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
     {
         base.OnJoinedRoom();
         CountVoters();
+        Debug.Log($"Total voters in room: {totalVoters}");
     }
 
     void CountVoters()
@@ -94,22 +90,23 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
 
         if (PhotonNetwork.IsMasterClient)
         {
-            photonView.RPC("StartNewTurn", RpcTarget.All, currentDebaterTurn);
+            photonView.RPC("StartNewTurn", RpcTarget.All, currentDebaterTurn, PhotonNetwork.Time);
         }
     }
 
     [PunRPC]
-    void StartNewTurn(string debaterRole)
+    void StartNewTurn(string debaterRole, double startTime)
     {
         currentDebaterTurn = debaterRole;
 
         if (activeCountdownCoroutine != null)
             StopCoroutine(activeCountdownCoroutine);
 
-        activeCountdownCoroutine = StartCoroutine(StartTurnCountdown(debaterRole));
+        Debug.Log($"{debaterRole} starts choosing argument...");
+        activeCountdownCoroutine = StartCoroutine(StartTurnCountdown(debaterRole, startTime));
     }
 
-    public IEnumerator StartTurnCountdown(string debaterRole)
+    public IEnumerator StartTurnCountdown(string debaterRole, double startTime)
     {
         if (turnCounter >= maxTurns)
         {
@@ -117,6 +114,7 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
             yield break;
         }
 
+        double endTime = startTime + countdownTime;
         hasTurnEnded = false;
         isTurnActive = false;
         ChoiceCountdownText.gameObject.SetActive(true);
@@ -132,54 +130,119 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
             argumentScrollView?.SetActive(false);
         }
 
-        float remaining = countdownTime;
-        while (remaining > 0 && !hasTurnEnded)
+        while (!hasTurnEnded)
         {
-            ChoiceCountdownText.text = $"{debaterRole} choosing argument in {Mathf.Ceil(remaining)}s...";
-            yield return new WaitForSeconds(1f);
-            remaining--;
-        }
+            double remaining = endTime - PhotonNetwork.Time;
+            if (remaining <= 0)
+                break;
 
-        ChoiceCountdownText.gameObject.SetActive(false);
+            ChoiceCountdownText.text = $"{debaterRole} choosing argument in {Mathf.CeilToInt((float)remaining)}s...";
+            yield return new WaitForSeconds(1f);
+        }
 
         if (!hasTurnEnded)
         {
-            EndTurn();
+            photonView.RPC("RPC_EndTurn", RpcTarget.All);
         }
     }
 
-    void EndTurn()
+    void OnArgumentSelected(string argument)
+    {
+        if (!isTurnActive || hasTurnEnded) return;
+
+        isTurnActive = false;
+        Debug.Log($"{currentDebaterTurn} finished choosing argument: {argument}");
+        photonView.RPC("SyncArgumentDisplay", RpcTarget.All, argument);
+        photonView.RPC("RPC_EndTurn", RpcTarget.All);
+    }
+
+    [PunRPC]
+    void RPC_EndTurn()
     {
         if (hasTurnEnded) return;
 
         hasTurnEnded = true;
         isTurnActive = false;
+        ChoiceCountdownText.gameObject.SetActive(false);
         argumentScrollView?.SetActive(false);
+
+        Debug.Log($"End of {currentDebaterTurn}'s turn.");
 
         if (PhotonNetwork.IsMasterClient)
         {
             if (currentDebaterTurn == "Debater 1")
-                photonView.RPC("StartNewTurn", RpcTarget.All, "Debater 2");
+                photonView.RPC("StartNewTurn", RpcTarget.All, "Debater 2", PhotonNetwork.Time);
             else
-                photonView.RPC("TriggerVotingPhase", RpcTarget.All);
+                photonView.RPC("TriggerVotingPhase", RpcTarget.All, PhotonNetwork.Time);
         }
     }
 
-    [PunRPC]
-    void TriggerVotingPhase()
+   [PunRPC]
+    void TriggerVotingPhase(double startTime)
     {
+        CountVoters();
         currentVotes.Clear();
 
-        string myRole = PhotonNetwork.LocalPlayer.CustomProperties["Role"] as string;
-        if (myRole == "Voter")
+        if (totalVoters == 0)
+        {
+            photonView.RPC("NotifyNoVoters", RpcTarget.All);
+            photonView.RPC("AnnounceRoundWinner", RpcTarget.All, "No Winner");
+
+            turnCounter++;
+
+            if (turnCounter >= maxTurns)
+                photonView.RPC("EndDebate", RpcTarget.All);
+            else
+                photonView.RPC("StartNewTurn", RpcTarget.All, "Debater 1", PhotonNetwork.Time);
+
+            return;
+        }
+
+        Debug.Log("Voting phase started for all players.");
+
+        // Stop previous coroutine if any
+        if (votingCountdownCoroutine != null)
+            StopCoroutine(votingCountdownCoroutine);
+
+        votingCountdownCoroutine = StartCoroutine(VotingCountdown(startTime));
+
+        // Voters only see voting UI
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Role", out object role) && (string)role == "Voter")
         {
             votingPanel.SetActive(true);
+        }
+    }
+
+    IEnumerator VotingCountdown(double startTime)
+    {
+        double endTime = startTime + votingCountdownTime;
+        ChoiceCountdownText.gameObject.SetActive(true);
+
+        while (true)
+        {
+            double remaining = endTime - PhotonNetwork.Time;
+            if (remaining <= 0)
+                break;
+
+            ChoiceCountdownText.text = $"Voter voting in {Mathf.CeilToInt((float)remaining)}s...";
+            yield return new WaitForSeconds(1f);
+        }
+
+        ChoiceCountdownText.gameObject.SetActive(false);
+
+        if (PhotonNetwork.LocalPlayer.CustomProperties.TryGetValue("Role", out object role) && (string)role == "Voter")
+        {
+            votingPanel.SetActive(false);
+            Debug.Log("Voter timed out. No vote submitted.");
+            photonView.RPC("ReceiveVoteResult", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, "NoVote");
         }
     }
 
     void CastVote(string winner)
     {
         votingPanel.SetActive(false);
+        ChoiceCountdownText.gameObject.SetActive(false);
+        if (votingCountdownCoroutine != null) StopCoroutine(votingCountdownCoroutine);
         photonView.RPC("ReceiveVoteResult", RpcTarget.MasterClient, PhotonNetwork.LocalPlayer.ActorNumber, winner);
     }
 
@@ -188,28 +251,34 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
     {
         if (!PhotonNetwork.IsMasterClient) return;
 
-        if (!currentVotes.ContainsKey(voterId))
+        if (!currentVotes.ContainsKey(voterId) && winner != "NoVote")
         {
             currentVotes[voterId] = winner;
-            Debug.Log($"✅ Vote from actor #{voterId}: {winner}");
+            Debug.Log($"Vote received from #{voterId}: {winner}");
         }
 
         if (currentVotes.Count >= totalVoters)
         {
+            Debug.Log("Voting phase complete.");
+
             string roundWinner = TallyVotes();
             photonView.RPC("AnnounceRoundWinner", RpcTarget.All, roundWinner);
 
             turnCounter++;
+            Debug.Log($"Round {turnCounter} complete.");
 
             if (turnCounter >= maxTurns)
-            {
                 photonView.RPC("EndDebate", RpcTarget.All);
-            }
             else
-            {
-                photonView.RPC("StartNewTurn", RpcTarget.All, "Debater 1");
-            }
+                photonView.RPC("StartNewTurn", RpcTarget.All, "Debater 1", PhotonNetwork.Time);
         }
+    }
+
+    [PunRPC]
+    void NotifyNoVoters()
+    {
+        ChoiceCountdownText.gameObject.SetActive(true);
+        ChoiceCountdownText.text = "No voters present. Skipping voting phase.";
     }
 
     string TallyVotes()
@@ -225,12 +294,37 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
     }
 
     [PunRPC]
+    void AnnounceRoundWinner(string winner)
+    {
+        Debug.Log($"Round winner: {winner}");
+        roundWinners.Add(winner);
+    }
+
+    [PunRPC]
     void EndDebate()
     {
+        Debug.Log("EndDebate called on " + PhotonNetwork.LocalPlayer.NickName);
+
+        // Stop any ongoing countdowns
+        if (activeCountdownCoroutine != null)
+        {
+            StopCoroutine(activeCountdownCoroutine);
+            activeCountdownCoroutine = null;
+        }
+        if (votingCountdownCoroutine != null)
+        {
+            StopCoroutine(votingCountdownCoroutine);
+            votingCountdownCoroutine = null;
+        }
+
+        // Hide all panels
         ChoiceCountdownText.gameObject.SetActive(true);
+        votingPanel?.SetActive(false);
+        argumentScrollView?.SetActive(false);
+
+        // Calculate winner (only once by MasterClient)
         string winner = CalculateOverallWinner();
         ChoiceCountdownText.text = $"Debate End! Winner: {winner}";
-        argumentScrollView?.SetActive(false);
     }
 
     string CalculateOverallWinner()
@@ -252,7 +346,6 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
         }
 
         var collected = PlayerArgumentManager.Instance.CollectedArguments;
-
         if (collected.Count == 0) return;
 
         argumentScrollView?.SetActive(true);
@@ -267,15 +360,6 @@ public class ArgumentUIManager : MonoBehaviourPunCallbacks
         }
 
         isTurnActive = true;
-    }
-
-    void OnArgumentSelected(string argument)
-    {
-        if (!isTurnActive || hasTurnEnded) return;
-
-        isTurnActive = false;
-        photonView.RPC("SyncArgumentDisplay", RpcTarget.All, argument);
-        EndTurn();
     }
 
     [PunRPC]
